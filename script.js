@@ -42,7 +42,8 @@ async function makeApiCall(endpoint, params = '') {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
         });
         
@@ -139,23 +140,13 @@ elements.saveConfig.addEventListener('click', async () => {
 elements.buyKey.addEventListener('click', () => {
     updateStatus('🔵 Abriendo tu canal de Telegram...', 'info');
     
-    // Intentar abrir en la app de Telegram primero
-    const telegramAppUrl = 'tg://resolve?domain=Multi_SMSPro';
+    // Abrir directamente en navegador (más compatible)
+    window.open('https://t.me/Multi_SMSPro', '_blank');
     
-    // Crear un enlace temporal para forzar la app
-    const tempLink = document.createElement('a');
-    tempLink.href = telegramAppUrl;
-    tempLink.target = '_blank';
-    
-    // Intentar abrir en la app
-    try {
-        tempLink.click();
-        updateStatus('🟢 Abriendo tu canal de Telegram...', 'success');
-    } catch (error) {
-        // Si falla, abrir en navegador
-        window.open('https://t.me/Multi_SMSPro', '_blank');
-        updateStatus('🔵 Abriendo en navegador...', 'info');
-    }
+    // Mostrar instrucciones adicionales
+    setTimeout(() => {
+        updateStatus('📋 Sigue las instrucciones en Telegram', 'info');
+    }, 1000);
 });
 
 // Seleccionar servicio
@@ -203,7 +194,7 @@ elements.getNumber.addEventListener('click', async () => {
         console.log('Respuesta completa de getNum:', data); // Debug
         
         // Verificar diferentes formatos de respuesta
-        if (data.tzid) {
+        if (data && data.tzid) {
             tzid = data.tzid;
             elements.phoneNumber.textContent = data.number || `TZID: ${tzid}`;
             elements.codeSection.style.display = 'block';
@@ -215,13 +206,13 @@ elements.getNumber.addEventListener('click', async () => {
             
             // Comenzar a verificar el código
             startCodeVerification();
-        } else if (data.response === 'NO_NUMBER') {
+        } else if (data && data.response === 'NO_NUMBER') {
             updateStatus('🔴 No hay números disponibles para este servicio', 'error');
-        } else if (data.response === 'NO_BALANCE') {
+        } else if (data && data.response === 'NO_BALANCE') {
             updateStatus('🔴 Saldo insuficiente', 'error');
-        } else if (data.response === 'EXCEPTION') {
+        } else if (data && data.response === 'EXCEPTION') {
             updateStatus('🔴 Error temporal del servidor. Intenta en 1 minuto.', 'error');
-        } else if (Object.keys(data).length === 0) {
+        } else if (data && Object.keys(data).length === 0) {
             updateStatus('🔴 Respuesta vacía. Intenta con otro país.', 'error');
         } else {
             console.error('Respuesta inesperada:', data);
@@ -291,7 +282,7 @@ elements.forceNew.addEventListener('click', async () => {
             elements.smsCode.textContent = '---';
             elements.getNumber.disabled = false;
             elements.forceNew.disabled = true;
-            elements.codeSection.style.display = 'none';
+            elements.codeSection.style.display = 'no';
             
             updateStatus('🔵 Listo para obtener nuevo número', 'info');
         }
