@@ -1,4 +1,4 @@
-console.log('🚀 Multi-SMS Pro Web - API CORRECTA');
+console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CORREGIDA');
 
 // Variables globales
 let apiKey = '';
@@ -38,11 +38,11 @@ const elements = {
     debugStatus: document.getElementById('debug-status')
 };
 
-// Función para hacer peticiones a la API CORRECTA
+// Función para hacer peticiones a la API REAL
 async function makeApiCall(endpoint, params = '', retry = true) {
     try {
-        // Usar la API correcta (versión española)
-        const url = `https://onlinesim.io/es/api/${endpoint}.php?apikey=${apiKey}&${params}`;
+        // Usar la API REAL que funciona ahora
+        const url = `https://onlinesim.io/api/${endpoint}.php?apikey=${apiKey}&${params}`;
         console.log('🔍 Llamada API:', url);
         
         const response = await fetch(url, {
@@ -485,7 +485,7 @@ function updateHistoryDisplay() {
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Multi-SMS Pro Web - API CORRECTA');
+    console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CORREGIDA');
     loadConfig();
     updateHistoryDisplay();
 });
