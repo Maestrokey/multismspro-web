@@ -1,4 +1,4 @@
-console.log('🚀 Multi-SMS Pro Web - VERSIÓN DEFINITIVA');
+console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CORREGIDA');
 
 // Variables globales
 let apiKey = '';
@@ -485,7 +485,7 @@ function updateHistoryDisplay() {
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Multi-SMS Pro Web - VERSIÓN DEFINITIVA');
+    console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CORREGIDA');
     loadConfig();
     updateHistoryDisplay();
 });
