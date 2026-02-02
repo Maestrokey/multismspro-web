@@ -7,6 +7,8 @@ let currentService = null;
 let currentNumber = null;
 let operationHistory = [];
 let tzid = null;
+let retryCount = 0;
+const MAX_RETRIES = 3;
 
 // Elementos del DOM
 const elements = {
@@ -19,7 +21,7 @@ const elements = {
     activeServiceInfo: document.getElementById('active-service-info'),
     activeService: document.getElementById('active-service'),
     serviceCost: document.getElementById('service-cost'),
-    numberSection: document.getElementById('number-section'),
+    numberSection: document('number-section'),
     phoneNumber: document.getElementById('phone-number'),
     getNumber: document.getElementById('get-number'),
     forceNew: document.getElementById('force-new'),
@@ -32,8 +34,8 @@ const elements = {
     debugStatus: document.getElementById('debug-status')
 };
 
-// Función para hacer peticiones a la API
-async function makeApiCall(endpoint, params = '') {
+// Función para hacer peticiones a la API con reintentos
+async function makeApiCall(endpoint, params = '', retry = true) {
     try {
         const url = `https://onlinesim.ru/api/${endpoint}.php?apikey=${apiKey}&${params}`;
         console.log('🔍 Llamada API:', url);
@@ -56,6 +58,14 @@ async function makeApiCall(endpoint, params = '') {
         return data;
     } catch (error) {
         console.error('❌ Error API:', error);
+        
+        if (retry && retryCount < MAX_RETRIES) {
+            retryCount++;
+            console.log(`🔄 Reintento ${retryCount}/${MAX_RETRIES} en 3 segundos...`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return makeApiCall(endpoint, params, false);
+        }
+        
         throw error;
     }
 }
@@ -175,20 +185,26 @@ function selectService(card) {
         elements.forceNew.disabled = false;
         
         updateStatus(`🟢 Servicio seleccionado: ${serviceName}`, 'success');
+        
+        // Resetear contador de reintentos
+        retryCount = 0;
     } catch (error) {
         console.error('Error seleccionando servicio:', error);
         updateStatus('🔴 Error seleccionando servicio', 'error');
     }
 }
 
-// Obtener número real
+// Obtener número real con reintentos
 elements.getNumber.addEventListener('click', async () => {
     if (!currentService) return;
     
     try {
         updateStatus('🔵 Obteniendo número real...', 'info');
         
-        // Obtener número real de la API
+        // Resetear contador de reintentos
+        retryCount = 0;
+        
+        // Obtener número real de la API con reintentos
         const data = await makeApiCall('getNum', `service=${currentService}&country=${elements.countrySelect.value}`);
         
         console.log('Respuesta completa de getNum:', data); // Debug
@@ -213,7 +229,7 @@ elements.getNumber.addEventListener('click', async () => {
         } else if (data && data.response === 'EXCEPTION') {
             updateStatus('🔴 Error temporal del servidor. Intenta en 1 minuto.', 'error');
         } else if (data && Object.keys(data).length === 0) {
-            updateStatus('🔴 Respuesta vacía. Intenta con otro país.', 'error');
+            updateStatus('🔴 Respuesta vacía. Intenta con otro país o servicio.', 'error');
         } else {
             console.error('Respuesta inesperada:', data);
             updateStatus('🔴 Error desconocido. Revisa la consola.', 'error');
@@ -236,7 +252,7 @@ async function startCodeVerification() {
                 if (data.response === 'STATUS_OK') {
                     clearInterval(checkInterval);
                     elements.smsCode.textContent = data.msg || data.code || 'Código recibido';
-                    updateStatus('🟢 Código SMS recibido', 'success');
+                    updateStatus('🔴 Código SMS recibido', 'success');
                     addToHistory(`Código recibido: ${data.msg || data.code}`);
                     
                     // Actualizar saldo
@@ -277,12 +293,14 @@ elements.forceNew.addEventListener('click', async () => {
             
             // Resetear estado
             tzid = null;
-            currentNumber = null;
-            elements.phoneNumber.textContent = '---';
-            elements.smsCode.textContent = '---';
+            currentNumber = {
+                phoneNumber.textContent = '---';
+                smsCode.textContent = '---';
+                codeSection.style.display = 'none';
+            };
+            
             elements.getNumber.disabled = false;
             elements.forceNew.disabled = true;
-            elements.codeSection.style.display = 'no';
             
             updateStatus('🔵 Listo para obtener nuevo número', 'info');
         }
@@ -331,9 +349,10 @@ elements.debugStatus.addEventListener('click', () => {
             currentService,
             currentNumber,
             tzid,
+            retryCount,
             history: operationHistory
         });
-        alert('Debug: Revisa la consola (F12)');
+        alert('Debug: Revisa la console (F12)');
     } catch (error) {
         console.error('Error en debug:', error);
     }
