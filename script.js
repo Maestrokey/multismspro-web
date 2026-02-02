@@ -2,10 +2,11 @@ console.log('🚀 Multi-SMS Pro Web iniciado');
 
 // Variables globales
 let apiKey = '';
-let balance = 0;
+let realBalance = 0;
 let currentService = null;
 let currentNumber = null;
 let operationHistory = [];
+let tzid = null;
 
 // Elementos del DOM
 const elements = {
@@ -31,19 +32,45 @@ const elements = {
     debugStatus: document.getElementById('debug-status')
 };
 
+// Función para hacer peticiones a la API
+async function makeApiCall(endpoint, params = '') {
+    try {
+        const url = `https://onlinesim.ru/api/${endpoint}.php?apikey=${apiKey}&${params}`;
+        console.log('🔍 Llamada API:', url);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('📋 Respuesta API:', data);
+        return data;
+    } catch (error) {
+        console.error('❌ Error API:', error);
+        throw error;
+    }
+}
+
 // Cargar configuración guardada
 function loadConfig() {
     try {
         const savedApiKey = localStorage.getItem('multisms_api_key');
-        const savedBalance = localStorage.getItem('multisms_balance');
         
         if (savedApiKey) {
             apiKey = savedApiKey;
             elements.apiKey.value = apiKey;
-            balance = parseFloat(savedBalance) || 0;
-            elements.balanceDisplay.textContent = `Saldo: $${balance.toFixed(2)}`;
-            elements.status.textContent = '🟢 Configuración cargada';
-            enableServices();
+            elements.status.textContent = '🔵 Verificando API Key...';
+            
+            // Verificar API Key y obtener saldo real
+            verifyApiKey();
         } else {
             elements.status.textContent = '🔴 Esperando configuración';
         }
@@ -53,8 +80,28 @@ function loadConfig() {
     }
 }
 
+// Verificar API Key con la API real
+async function verifyApiKey() {
+    try {
+        const data = await makeApiCall('getBalance');
+        
+        if (data.balance !== undefined) {
+            realBalance = parseFloat(data.balance);
+            elements.balanceDisplay.textContent = `Saldo: $${realBalance.toFixed(2)}`;
+            elements.status.textContent = '🟢 API Key válida';
+            enableServices();
+        } else {
+            throw new Error('API Key inválida');
+        }
+    } catch (error) {
+        console.error('Error verificando API Key:', error);
+        elements.status.textContent = '🔴 API Key inválida';
+        localStorage.removeItem('multisms_api_key');
+    }
+}
+
 // Guardar configuración
-elements.saveConfig.addEventListener('click', () => {
+elements.saveConfig.addEventListener('click', async () => {
     try {
         apiKey = elements.apiKey.value.trim();
         if (!apiKey) {
@@ -62,24 +109,32 @@ elements.saveConfig.addEventListener('click', () => {
             return;
         }
         
-        localStorage.setItem('multisms_api_key', apiKey);
-        localStorage.setItem('multisms_balance', balance.toString());
+        elements.status.textContent = '🔵 Verificando API Key...';
         
-        elements.balanceDisplay.textContent = `Saldo: $${balance.toFixed(2)}`;
-        updateStatus('🟢 Configuración guardada correctamente', 'success');
-        enableServices();
+        // Verificar API Key antes de guardar
+        const data = await makeApiCall('getBalance');
+        
+        if (data.balance !== undefined) {
+            localStorage.setItem('multisms_api_key', apiKey);
+            realBalance = parseFloat(data.balance);
+            elements.balanceDisplay.textContent = `Saldo: $${realBalance.toFixed(2)}`;
+            updateStatus('🟢 API Key guardada y verificada', 'success');
+            enableServices();
+        } else {
+            throw new Error('API Key inválida');
+        }
     } catch (error) {
         console.error('Error guardando configuración:', error);
-        updateStatus('🔴 Error guardando configuración', 'error');
+        updateStatus('🔴 API Key inválida. Verifícala e intenta nuevamente.', 'error');
     }
 });
 
-// Comprar llave (simulado)
+// Comprar llave
 elements.buyKey.addEventListener('click', () => {
-    updateStatus('🔵 Contactando para comprar llave...', 'info');
+    updateStatus('🔵 Redirigiendo a comprar API Key...', 'info');
     setTimeout(() => {
-        updateStatus('🟡 Por favor contacta al proveedor para comprar una llave', 'warning');
-    }, 2000);
+        window.open('https://onlinesim.ru/', '_blank');
+    }, 1000);
 });
 
 // Seleccionar servicio
@@ -114,48 +169,97 @@ function selectService(card) {
     }
 }
 
-// Obtener número (simulado)
+// Obtener número real
 elements.getNumber.addEventListener('click', async () => {
     if (!currentService) return;
     
     try {
-        updateStatus('🔵 Obteniendo número...', 'info');
+        updateStatus('🔵 Obteniendo número real...', 'info');
         
-        // Simulación de obtención de número
-        setTimeout(() => {
-            currentNumber = '+34' + Math.floor(Math.random() * 900000000 + 100000000);
-            elements.phoneNumber.textContent = currentNumber;
+        // Obtener número real de la API
+        const data = await makeApiCall('getNum', `service=${currentService}&country=${elements.countrySelect.value}`);
+        
+        if (data.tzid) {
+            tzid = data.tzid;
+            elements.phoneNumber.textContent = data.number || `TZID: ${tzid}`;
             elements.codeSection.style.display = 'block';
             elements.getNumber.disabled = true;
             elements.forceNew.disabled = false;
             
             updateStatus('🟢 Número obtenido correctamente', 'success');
-            addToHistory(`Número obtenido: ${currentNumber}`);
+            addToHistory(`Número obtenido: ${data.number || tzid}`);
             
-            // Simular recepción de código
-            setTimeout(() => {
-                const code = Math.floor(Math.random() * 900000 + 100000);
-                elements.smsCode.textContent = code;
-                updateStatus('🟢 Código SMS recibido', 'success');
-                addToHistory(`Código recibido: ${code}`);
-            }, 5000);
-        }, 2000);
+            // Comenzar a verificar el código
+            startCodeVerification();
+        } else {
+            throw new Error('No se pudo obtener número');
+        }
     } catch (error) {
         console.error('Error obteniendo número:', error);
-        updateStatus('🔴 Error obteniendo número', 'error');
+        updateStatus('🔴 Error obteniendo número. Verifica tu saldo.', 'error');
     }
 });
 
+// Verificar código SMS real
+async function startCodeVerification() {
+    try {
+        updateStatus('🔵 Esperando código SMS...', 'info');
+        
+        const checkInterval = setInterval(async () => {
+            try {
+                const data = await makeApiCall('getState', `tzid=${tzid}`);
+                
+                if (data.response === 'STATUS_OK') {
+                    clearInterval(checkInterval);
+                    elements.smsCode.textContent = data.msg || data.code || 'Código recibido';
+                    updateStatus('🟢 Código SMS recibido', 'success');
+                    addToHistory(`Código recibido: ${data.msg || data.code}`);
+                    
+                    // Actualizar saldo
+                    setTimeout(() => updateBalance(), 2000);
+                } else if (data.response === 'STATUS_WAIT_CODE') {
+                    updateStatus('🔵 Esperando código...', 'info');
+                } else if (data.response === 'STATUS_CANCEL') {
+                    clearInterval(checkInterval);
+                    updateStatus('🔴 Operación cancelada', 'error');
+                }
+            } catch (error) {
+                console.error('Error verificando código:', error);
+            }
+        }, 3000); // Verificar cada 3 segundos
+        
+        // Detener después de 5 minutos máximo
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            if (elements.smsCode.textContent === '---') {
+                updateStatus('🔴 Tiempo de espera agotado', 'error');
+            }
+        }, 300000);
+        
+    } catch (error) {
+        console.error('Error iniciando verificación:', error);
+        updateStatus('🔴 Error iniciando verificación', 'error');
+    }
+}
+
 // Forzar nuevo número
-elements.forceNew.addEventListener('click', () => {
+elements.forceNew.addEventListener('click', async () => {
     try {
         if (confirm('¿Estás seguro de solicitar un nuevo número?')) {
+            // Cancelar operación actual
+            if (tzid) {
+                await makeApiCall('setOperationOk', `tzid=${tzid}&ban=1`);
+            }
+            
+            // Resetear estado
+            tzid = null;
             currentNumber = null;
             elements.phoneNumber.textContent = '---';
             elements.smsCode.textContent = '---';
             elements.getNumber.disabled = false;
             elements.forceNew.disabled = true;
             elements.codeSection.style.display = 'none';
+            
             updateStatus('🔵 Listo para obtener nuevo número', 'info');
         }
     } catch (error) {
@@ -181,14 +285,28 @@ elements.copyCode.addEventListener('click', () => {
     }
 });
 
+// Actualizar saldo
+async function updateBalance() {
+    try {
+        const data = await makeApiCall('getBalance');
+        if (data.balance !== undefined) {
+            realBalance = parseFloat(data.balance);
+            elements.balanceDisplay.textContent = `Saldo: $${realBalance.toFixed(2)}`;
+        }
+    } catch (error) {
+        console.error('Error actualizando saldo:', error);
+    }
+}
+
 // Debug
 elements.debugStatus.addEventListener('click', () => {
     try {
         console.log('Estado actual:', {
             apiKey,
-            balance,
+            realBalance,
             currentService,
             currentNumber,
+            tzid,
             history: operationHistory
         });
         alert('Debug: Revisa la consola (F12)');
