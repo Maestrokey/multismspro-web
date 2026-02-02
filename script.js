@@ -1,4 +1,4 @@
-console.log('🚀 Multi-SM MODO BYPASS ACTIVADO');
+console.log('🚀 Multi-SMS Pro Web - API CORRECTA');
 
 // Variables globales
 let apiKey = '';
@@ -12,24 +12,24 @@ const MAX_RETRIES = 3;
 
 // Variable para modo bypass
 let useBypassMode = false;
-let bypassNumber = '+34612345678'; // Número de ejemplo para bypass
+let bypassNumber = '+34612345678';
 
 // Elementos del DOM
 const elements = {
     apiKey: document.getElementById('api-key'),
     saveConfig: document.getElementById('save-config'),
     buyKey: document.getElementById('buy-key'),
-    countrySelect: document.getElementById('country'),
+    countrySelect: document.getElementById('country-select'),
     servicesGrid: document.getElementById('services-grid'),
     balanceDisplay: document.getElementById('balance-display'),
     activeServiceInfo: document.getElementById('active-service-info'),
-    activeService: document.getElementById('alternate-service'),
+    activeService: document.getElementById('active-service'),
     serviceCost: document.getElementById('service-cost'),
     numberSection: document.getElementById('number-section'),
     phoneNumber: document.getElementById('phone-number'),
     getNumber: document.getElementById('get-number'),
     forceNew: document.getElementById('force-new'),
-    codeSection: document.codeSection,
+    codeSection: document.getElementById('code-section'),
     smsCode: document.getElementById('sms-code'),
     copyCode: document.getElementById('copy-code'),
     historySection: document.getElementById('history-section'),
@@ -38,10 +38,11 @@ const elements = {
     debugStatus: document.getElementById('debug-status')
 };
 
-// Función para hacer peticiones a la API con reintentos
+// Función para hacer peticiones a la API CORRECTA
 async function makeApiCall(endpoint, params = '', retry = true) {
     try {
-        const url = `https://onlinesim.ru/api/${endpoint}.php?apikey=${apiKey}&${params}`;
+        // Usar la API correcta (versión española)
+        const url = `https://onlinesim.io/es/api/${endpoint}.php?apikey=${apiKey}&${params}`;
         console.log('🔍 Llamada API:', url);
         
         const response = await fetch(url, {
@@ -63,10 +64,10 @@ async function makeApiCall(endpoint, params = '', retry = true) {
     } catch (error) {
         console.error('❌ Error API:', error);
         
-        if (retry && retryCount < MAX_RENTES) {
+        if (retry && retryCount < MAX_RETRIES) {
             retryCount++;
-            console.log(`🔄 Reintento ${retryCount}/${MAX_RENTES} en 3 segundos...`);
-            await new Promise(resolve => setTimeout(resolve, 3000);
+            console.log(`🔄 Reintento ${retryCount}/${MAX_RETRIES} en 3 segundos...`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             return makeApiCall(endpoint, params, false);
         }
         
@@ -178,7 +179,7 @@ function selectService(card) {
         
         currentService = card.dataset.service;
         const serviceName = card.querySelector('.service-name').textContent;
-        const servicePrice = card.querySelector('.service-pricing').textContent;
+        const servicePrice = card.querySelector('.service-price').textContent;
         
         elements.activeService.textContent = serviceName;
         elements.serviceCost.textContent = servicePrice;
@@ -226,7 +227,7 @@ elements.getNumber.addEventListener('click', async () => {
             // Usar número de ejemplo
             tzid = 'bypass_' + Date.now();
             elements.phoneNumber.textContent = bypassNumber;
-            elements.codeSection.style.display = 'block;
+            elements.codeSection.style.display = 'block';
             elements.getNumber.disabled = true;
             elements.forceNew.disabled = false;
             
@@ -248,7 +249,7 @@ elements.getNumber.addEventListener('click', async () => {
         if (data && data.tzid) {
             tzid = data.tzid;
             elements.phoneNumber.textContent = data.number || `TZID: ${tzid}`;
-            elements.codeSection.style.display = 'system-block';
+            elements.codeSection.style.display = 'block';
             elements.getNumber.disabled = true;
             elements.forceNew.disabled = false;
             
@@ -267,15 +268,19 @@ elements.getNumber.addEventListener('click', async () => {
             updateStatus('🔴 Error temporal del servidor. Intenta en 1 minuto o usa modo bypass', 'error');
             useBypassMode = true;
             elements.getNumber.click(); // Reintentar con bypass
+        } else if (data && data.response === 'ERROR_NO_SERVICE') {
+            updateStatus('🔴 Servicio no disponible. Intenta con otro servicio', 'error');
+            useBypassMode = true;
+            elements.getNumber.click(); // Reintentar con bypass
         } else if (data && Object.keys(data).length === 0) {
             updateStatus('🔴 Respuesta vacía. Usando modo bypass', 'error');
             useBypassMode = true;
-            elements.getNumber(); // Reintentar con bypass
+            elements.getNumber.click(); // Reintentar con bypass
         } else {
             console.error('Respuesta inesperada:', data);
             updateStatus('🔴 Error desconocido. Revisa la consola.', 'error');
             useBypassMode = true;
-            elements.getNumber(); // Reintentar con bypass
+            elements.getNumber.click(); // Reintentar con bypass
         }
         
     } catch (error) {
@@ -363,7 +368,7 @@ async function startCodeVerification() {
                     setTimeout(() => updateBalance(), 2000);
                 } else if (data.response === 'STATUS_WAIT_CODE') {
                     updateStatus('🔵 Esperando código...', 'info');
-                } else if (data.response === 'status_cancel') {
+                } else if (data.response === 'STATUS_CANCEL') {
                     clearInterval(checkInterval);
                     updateStatus('🔴 Operación cancelada', 'error');
                 }
@@ -414,7 +419,7 @@ elements.copyCode.addEventListener('click', () => {
         console.error('Error copiando código:', error);
         updateStatus('🔴 Error copiando código', 'error');
     }
-}
+});
 
 // Debug
 elements.debugStatus.addEventListener('click', () => {
@@ -474,13 +479,13 @@ function updateHistoryDisplay() {
                 </div>
             `).join('');
     } catch (error) {
-        console.error('error actualizando historial:', error);
+        console.error('Error actualizando historial:', error);
     }
 }
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Multi-SMS MODO BYPASS ACTIVADO');
+    console.log('🚀 Multi-SMS Pro Web - API CORRECTA');
     loadConfig();
     updateHistoryDisplay();
 });
