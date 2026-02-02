@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-SMS Pro - Números Virtuales</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="assets/logo.png">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">📱 Multi-SMS Pro</div>
+            <div class="balance-display" id="balance-display">Saldo: $0.00</div>
+        </header>
+
+        <section class="api-section">
+            <h2>🔑 Configuración</h2>
+            <input type="text" id="api-key" placeholder="Ingresa tu Llave de Activación">
+            <button id="save-config">Guardar Configuración</button>
+            <button id="buy-key">Comprar Llave</button>
+        </section>
+
+        <section class="country-section">
+            <h2>🌍 Selecciona País</h2>
+            <select id="country-select">
+                <option value="34">🇪🇸 España (+34)</option>
+                <option value="39">🇮🇹 Italia (+39)</option>
+                <option value="33">🇫🇷 Francia (+33)</option>
+                <option value="44">🇬🇧 Reino Unido (+44)</option>
+                <option value="90">🇹🇷 Turquía (+90)</option>
+                <option value="351">🇵🇹 Portugal (+351)</option>
+            </select>
+        </section>
+
+        <section class="services-section">
+            <h2>📱 Servicios Disponibles</h2>
+            <div class="services-grid" id="services-grid">
+                <div class="service-card" data-service="wallapop_es">
+                    <div class="service-icon">🛍️</div>
+                    <div class="service-name">wallapop</div>
+                    <div class="service-price">$0.9</div>
+                </div>
+                <div class="service-card" data-service="whatsapp_es">
+                    <div class="service-icon">💬</div>
+                    <div class="service-name">whatsapp</div>
+                    <div class="service-price">$22</div>
+                </div>
+                <div class="service-card" data-service="telegram_es">
+                    <div class="service-icon">✈️</div>
+                    <div class="service-name">telegram</div>
+                    <div class="service-price">$15</div>
+                </div>
+                <div class="service-card" data-service="facebook_es">
+                    <div class="service-icon">📘</div>
+                    <div class="service-name">facebook</div>
+                    <div class="service-price">$0.9</div>
+                </div>
+                <div class="service-card" data-service="instagram_es">
+                    <div class="service-icon">📷</div>
+                    <div class="service-name">instagram</div>
+                    <div class="service-price">$0.92</div>
+                </div>
+                <div class="service-card" data-service="gmail_es">
+                    <div class="service-icon">📧</div>
+                    <div class="service-name">gmail</div>
+                    <div class="service-price">$1.95</div>
+                </div>
+                <div class="service-card" data-service="microsoft_es">
+                    <div class="service-icon">🪟</div>
+                    <div class="service-name">microsoft</div>
+                    <div class="service-price">$1</div>
+                </div>
+                <div class="service-card" data-service="yahoo_es">
+                    <div class="service-icon">📮</div>
+                    <div class="service-name">yahoo</div>
+                    <div class="service-price">$0.9</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="active-service" id="active-service-info" style="display: none;">
+            <h3>Servicio Activo</h3>
+            <div class="service-details">
+                <span id="active-service">---</span>
+                <span id="service-cost">$0.00</span>
+            </div>
+        </section>
+
+        <section class="number-section" id="number-section" style="display: none;">
+            <h3>📞 Número Asignado</h3>
+            <div class="phone-number" id="phone-number">---</div>
+            <div class="buttons">
+                <button id="get-number" disabled>📞 Obtener Número</button>
+                <button id="force-new" disabled>🆕 Forzar Nuevo</button>
+            </div>
+        </section>
+
+        <section class="code-section" id="code-section" style="display: none;">
+            <h3>🔐 Código SMS</h3>
+            <div class="sms-code" id="sms-code">---</div>
+            <button id="copy-code">📋 Copiar Código</button>
+        </section>
+
+        <section class="history-section" id="history-section">
+            <h3>📚 Historial Reciente</h3>
+            <div class="history-content" id="history-content">
+                <p class="no-history">No hay operaciones recientes</p>
+            </div>
+        </section>
+
+        <footer class="status-bar">
+            <div id="status">🔴 Esperando configuración</div>
+            <button id="debug-status">🐛 Debug</button>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
