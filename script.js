@@ -88,8 +88,14 @@ async function verifyApiKey() {
         if (data.balance !== undefined) {
             realBalance = parseFloat(data.balance);
             elements.balanceDisplay.textContent = `Saldo: $${realBalance.toFixed(2)}`;
-            elements.status.textContent = '🟢 API Key válida';
-            enableServices();
+            
+            // Verificar si hay saldo suficiente
+            if (realBalance < 0.9) {
+                elements.status.textContent = '🔡 Saldo insuficiente para wallapop ($0.9)';
+            } else {
+                elements.status.textContent = '🟢 API Key válida';
+                enableServices();
+            }
         } else {
             throw new Error('API Key inválida');
         }
@@ -131,9 +137,9 @@ elements.saveConfig.addEventListener('click', async () => {
 
 // Comprar llave
 elements.buyKey.addEventListener('click', () => {
-    updateStatus('🔵 Redirigiendo a comprar API Key...', 'info');
+    updateStatus('🔵 Redirigiendo a Telegram...', 'info');
     setTimeout(() => {
-        window.open('https://onlinesim.ru/', '_blank');
+        window.open('https://t.me/onlinesim_bot', '_blank');
     }, 1000);
 });
 
@@ -179,6 +185,9 @@ elements.getNumber.addEventListener('click', async () => {
         // Obtener número real de la API
         const data = await makeApiCall('getNum', `service=${currentService}&country=${elements.countrySelect.value}`);
         
+        console.log('Respuesta completa de getNum:', data); // Debug
+        
+        // Verificar diferentes formatos de respuesta
         if (data.tzid) {
             tzid = data.tzid;
             elements.phoneNumber.textContent = data.number || `TZID: ${tzid}`;
@@ -191,12 +200,17 @@ elements.getNumber.addEventListener('click', async () => {
             
             // Comenzar a verificar el código
             startCodeVerification();
+        } else if (data.response === 'NO_NUMBER') {
+            updateStatus('🔴 No hay números disponibles para este servicio', 'error');
+        } else if (data.response === 'NO_BALANCE') {
+            updateStatus('🔴 Saldo insuficiente', 'error');
         } else {
-            throw new Error('No se pudo obtener número');
+            console.error('Respuesta inesperada:', data);
+            updateStatus('🔴 Error desconocido. Revisa la consola.', 'error');
         }
     } catch (error) {
         console.error('Error obteniendo número:', error);
-        updateStatus('🔴 Error obteniendo número. Verifica tu saldo.', 'error');
+        updateStatus('🔴 Error de conexión con la API', 'error');
     }
 });
 
