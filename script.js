@@ -3,7 +3,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- CONFIGURACIÓN ---
     let currentApiKey = localStorage.getItem('onlinesim_apikey') || '';
-    const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+    const PROXY_URL = 'https://mi-proxy-onlinesim.onrender.com/api/';
 
     // --- ELEMENTOS DEL DOM ---
     const apiKeyInput = document.getElementById('api-key');
@@ -261,3 +261,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initialize();
 });
+
