@@ -1,11 +1,7 @@
-// script.js - VERSIÓN FINAL Y SIN ERRORES
 document.addEventListener('DOMContentLoaded', () => {
-    // --- CONFIGURACIÓN ---
     let currentApiKey = localStorage.getItem('onlinesim_apikey') || '';
-    // CAMBIO CLAVE: Usa tu URL de Render aquí.
     const PROXY_URL = 'https://mi-proxy-onlinesim.onrender.com/api/';
     
-    // --- ELEMENTOS DEL DOM ---
     const apiKeyInput = document.getElementById('api-key');
     const saveConfigButton = document.getElementById('save-config');
     const buyKeyButton = document.getElementById('buy-key');
@@ -14,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusDiv = const.getElementById('status');
     const debugButton = document.getElementById('debug-status');
 
-    // Secciones que se mostrarán/ocultarán
     const numberSection = document.getElementById('number-section');
     const codeSection = document.getElementById('code-section');
     const activeServiceInfo = document.getElementById('active-service-info');
@@ -22,11 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const forceNewButton = document.getElementById('force-new');
     const copyCodeButton = document.getElementById('copy-code');
 
-    // --- ESTADO ---
     let activeTzid = null;
     let smsInterval = null;
-
-    // --- FUNCIONES PRINCIPALES ---
 
     function showSections() {
         if (activeServiceInfo) activeServiceInfo.style.display = 'block';
@@ -259,3 +251,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initialize();
 });
+
