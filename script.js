@@ -1,30 +1,23 @@
-// script.js - VERSIÓN FINAL Y COMPLETA
-
+// script.js - VERSIÓN FINAL Y CORREGIDA
 document.addEventListener('DOMContentLoaded', () => {
     // --- CONFIGURACIÓN ---
     let currentApiKey = localStorage.getItem('onlinesim_apikey') || '';
+    // CAMBIO CLAVE: Usa tu URL de Render aquí.
     const PROXY_URL = 'https://mi-proxy-onlinesim.onrender.com/api/';
-
+    
     // --- ELEMENTOS DEL DOM ---
     const apiKeyInput = document.getElementById('api-key');
     const saveConfigButton = document.getElementById('save-config');
-    const buyKeyButton = document.getElementById('buy-key'); // Botón para comprar llave
+    const buyKeyButton = document.getElementById('buy-key');
     const balanceDisplay = document.getElementById('balance-display');
     const countrySelect = document.getElementById('country-select');
-    const statusDiv = document.getElementById('status');
+    const statusDiv = const.getElementById('status');
     const debugButton = document.getElementById('debug-status');
 
     // Secciones que se mostrarán/ocultarán
     const numberSection = document.getElementById('number-section');
-    const codeSection = document.getElementById('code-section');
+    const codeSection = codeSection = document.getElementById('code-section');
     const activeServiceInfo = document.getElementById('active-service-info');
-
-    // Elementos dentro de las secciones
-    const phoneNumberSpan = document.getElementById('phone-number');
-    const tzidSpan = document.getElementById('tzid');
-    const activationCodeSpan = document.getElementById('sms-code');
-    const activeServiceDisplay = document.getElementById('active-service');
-    const serviceCostDisplay = document.getElementById('service-cost');
     const getNumberButton = document.getElementById('get-number');
     const forceNewButton = document.getElementById('force-new');
     const copyCodeButton = document.getElementById('copy-code');
@@ -33,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeTzid = null;
     let smsInterval = null;
 
-    // --- FUNCIONES DE UI ---
+    // --- FUNCIONES PRINCIPALES ---
+
     function showSections() {
         if (activeServiceInfo) activeServiceInfo.style.display = 'block';
         if (numberSection) numberSection.style.display = 'block';
@@ -55,15 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetUI() {
         if (phoneNumberSpan) phoneNumberSpan.textContent = '';
-        if (tzidSpan) tzidSpan.textContent = '';
         if (activationCodeSpan) activationCodeSpan.textContent = '---';
-        if (getNumberButton) getNumberButton.disabled = false;
-        if (forceNewButton) forceNewButton.disabled = true;
         if (smsInterval) clearInterval(smsInterval);
         activeTzid = null;
+        if (getNumberButton) getNumberButton.disabled = false;
+        if (forceNewButton) forceNewButton.disabled = true;
     }
-
-    // --- FUNCIONES PRINCIPALES ---
 
     async function getBalance() {
         if (!currentApiKey) {
@@ -76,35 +67,33 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.response === 'ACCESS_NUMBER' && balanceDisplay) {
                 balanceDisplay.textContent = `Saldo: $${parseFloat(data.balance).toFixed(2)}`;
-                updateStatus('🟢 API Key configurada y saldo cargado.');
+                updateStatus('🟢 API Key verificada.');
             } else if (data.response === 'ERROR_WRONG_API_KEY') {
-                throw new Error('API Key inválida.');
+                updateStatus('🔴 Error al verificar la API Key.', true);
             }
         } catch (error) {
             console.error('Error obteniendo balance:', error);
-            if (balanceDisplay) balanceDisplay.textContent = 'Saldo: Error';
-            updateStatus('🔴 Error al verificar la API Key.', true);
+            updateStatus('🔴 Error de conexión al verificar la API Key.', true);
         }
     }
 
     async function buyNumber() {
         const selectedServiceCard = document.querySelector('.service-card.selected');
-        const selectedService = selectedServiceCard ? selectedServiceCard.dataset.service : null;
+        const selectedService = selectedServiceCard ? selectedService.dataset.service : null;
         const selectedCountry = countrySelect ? countrySelect.value : null;
 
-        if (!currentApiKey) {
-            alert('Por favor, guarda tu API Key primero.');
-            return;
-        }
         if (!selectedService) {
             alert('Por favor, selecciona un servicio.');
             return;
         }
+        if (!currentApiKey || currentApiKey === 'TU_API_KEY_AQUI') {
+            alert('Por favor, configura tu API Key.');
+            return;
+        }
 
         resetUI();
-        if (getNumberButton) getNumberButton.disabled = true;
-        updateStatus('🔵 Solicitando número...', false);
-        if (phoneNumberSpan) phoneNumberSpan.textContent = 'Solicitando...';
+        setUIState('loading');
+        if (phoneNumberSpan) phoneNumberSpan.textContent = 'Solicitando número...';
 
         try {
             const getNumUrl = `${PROXY_URL}https://onlinesim.io/api/get_num.php?apikey=${currentApiKey}&service=${selectedService}&country=${selectedCountry}&ref=mail`;
@@ -118,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.response === 'NUMBER' && data.number) {
                 const phoneNumber = data.number;
                 activeTzid = data.tzid;
-                
+
                 if (phoneNumberSpan) phoneNumberSpan.textContent = `+${phoneNumber}`;
                 if (tzidSpan) tzidSpan.textContent = `TZID: ${activeTzid}`;
                 updateStatus(`✅ Número +${phoneNumber} recibido. Esperando SMS...`);
@@ -127,12 +116,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } else if (data.response === 'NO_NUMBER') {
                 throw new Error('No hay números disponibles para este servicio.');
+            } else if (data.response === 'ERROR_WRONG_API_KEY') {
+                throw new Error('Tu API Key es incorrecta.');
             } else {
                 throw new Error('La API devolvió una respuesta inesperada.');
             }
 
         } catch (error) {
-            console.error('❌ Error:', error);
+            console.error('❌� Error:', error);
             updateStatus(`🔴 Error: ${error.message}`, true);
             if (phoneNumberSpan) phoneNumberSpan.textContent = `Error: ${error.message}`;
             alert(`Ocurrió un error: ${error.message}`);
@@ -148,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const delay = 5000;
 
         if (activationCodeSpan) activationCodeSpan.textContent = 'Esperando código...';
+        updateStatus('🔵 Esperando código SMS...');
 
         smsInterval = setInterval(async () => {
             attempts++;
@@ -168,18 +160,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (status === 'TZ_NUM_USED' || status === 'TZ_NUM_EXPIRED') {
                     clearInterval(smsInterval);
                     if (activationCodeSpan) activationCodeSpan.textContent = 'Sesión finalizada';
-                    updateStatus('🔴 Número usado o expiró.', true);
+                    updateStatus('🔴 Sesión expiró.');
                 }
+                } else if (status === 'TZ_NUM_WAIT' || status === 'TZ_NUM_EMPTY') {
+                    // Seguir esperando...
+                }
+
             } catch (error) {
-                console.error(`Error verificando estado:`, error);
+                console.error(`Error verificando estado: ${error}`);
             }
 
             if (attempts >= maxAttempts) {
                 clearInterval(smsInterval);
-                if (activationCodeSpan) activationCodeSpan.textContent = 'Tiempo agotado';
+                if (activationCodeSpan) activationCodeSpan.textContent = 'Tiempo agotado.';
                 updateStatus('🔴 Tiempo de espera agotado.', true);
             }
         }, delay);
+    }
+
+    function setUIState(state) {
+        if (getNumberButton) getNumberButton.disabled = (state === 'loading');
+        if (forceNewButton) forceNewButton.disabled = (state !== 'received' && state !== 'code');
+        if (getNumberButton) {
+            getNumberButton.textContent = (state === 'loading') ? 'Comprando...' : '📞 Obtener Número';
+        }
     }
 
     // --- EVENT LISTENERS ---
@@ -199,17 +203,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (buyKeyButton) {
         buyKeyButton.addEventListener('click', () => {
-            // Redirige al usuario a la página de compra de claves de OnlineSim
-            window.open('https://onlinesim.io/pay', '_blank');
+            window.open('https://onlinesim.io/', '_blank');
         });
     }
     
     if (getNumberButton) getNumberButton.addEventListener('click', buyNumber);
+    if (forceNewButton) forceNewButton.addEventListener('click', () => {
+        forceNewNumber();
+    });
 
     if (copyCodeButton) {
         copyCodeButton.addEventListener('click', () => {
             const code = activationCodeSpan ? activationCodeSpan.textContent : '';
-            if (code && code !== '---' && code !== 'Esperando código...' && code !== 'Tiempo agotado') {
+            if (code && code !== '---' && code !== 'Esperando código...' && code !== 'Tiempo agotado.') {
                 navigator.clipboard.writeText(code).then(() => {
                     alert('Código copiado al portapapeles.');
                 }).catch(err => {
@@ -231,26 +237,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const servicePrice = card.querySelector('.service-price').textContent;
             if (activeServiceDisplay) activeServiceDisplay.textContent = serviceName;
             if (serviceCostDisplay) serviceCostDisplay.textContent = servicePrice;
+            if (serviceSelect) serviceSelect.value = card.dataset.service;
         });
     });
 
-    if (debugButton) {
-        debugButton.addEventListener('click', () => {
-            console.log('--- ESTADO DE DEPURACIÓN ---');
-            console.log('API Key:', currentApiKey ? 'Configurada' : 'No configurada');
-            console.log('Servicio seleccionado:', document.querySelector('.service-card.selected')?.dataset.service);
-            console.log('País seleccionado:', countrySelect?.value);
-            console.log('TZID activo:', activeTzid);
-            console.log('--------------------------');
-        });
-    }
-
     // --- INICIALIZACIÓN ---
     function initialize() {
-        if (apiKeyInput) apiKeyInput.value = currentApiKey;
-        
+        const savedApiKey = localStorage.getItem('onlinesim_apikey');
+        if (savedApiKey) {
+            currentApiKey = savedApiKey;
+            if (apiKeyInput) apiKeyInput.value = currentApiKey;
+        }
+        getBalance();
         if (currentApiKey) {
-            getBalance();
             showSections();
             updateStatus('🟢 Listo para operar.');
         } else {
@@ -261,4 +260,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initialize();
 });
-
