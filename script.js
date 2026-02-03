@@ -1,4 +1,4 @@
-// script.js - VERSIÓN FINAL Y CORREGIDA
+// script.js - VERSIÓN FINAL Y SIN ERRORES
 document.addEventListener('DOMContentLoaded', () => {
     // --- CONFIGURACIÓN ---
     let currentApiKey = localStorage.getItem('onlinesim_apikey') || '';
@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Secciones que se mostrarán/ocultarán
     const numberSection = document.getElementById('number-section');
-    const codeSection = codeSection = document.getElementById('code-section');
+    const codeSection = document.getElementById('code-section');
     const activeServiceInfo = document.getElementById('active-service-info');
     const getNumberButton = document.getElementById('get-number');
     const forceNewButton = document.getElementById('force-new');
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function getBalance() {
-        if (!currentApiKey) {
+        if (!currentApiKey || currentApiKey === 'TU_API_KEY_AQUI') {
             if (balanceDisplay) balanceDisplay.textContent = 'Saldo: N/A';
             return;
         }
@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
-            console.error('❌� Error:', error);
+            console.error('❌ Error:', error);
             updateStatus(`🔴 Error: ${error.message}`, true);
             if (phoneNumberSpan) phoneNumberSpan.textContent = `Error: ${error.message}`;
             alert(`Ocurrió un error: ${error.message}`);
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const delay = 5000;
 
         if (activationCodeSpan) activationCodeSpan.textContent = 'Esperando código...';
-        updateStatus('🔵 Esperando código SMS...');
+        updateStatus('🔵� Esperando código SMS...');
 
         smsInterval = setInterval(async () => {
             attempts++;
@@ -161,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     clearInterval(smsInterval);
                     if (activationCodeSpan) activationCodeSpan.textContent = 'Sesión finalizada';
                     updateStatus('🔴 Sesión expiró.');
-                }
                 } else if (status === 'TZ_NUM_WAIT' || status === 'TZ_NUM_EMPTY') {
                     // Seguir esperando...
                 }
@@ -237,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const servicePrice = card.querySelector('.service-price').textContent;
             if (activeServiceDisplay) activeServiceDisplay.textContent = serviceName;
             if (serviceCostDisplay) serviceCostDisplay.textContent = servicePrice;
-            if (serviceSelect) serviceSelect.value = card.dataset.service;
+            if (countrySelect) countrySelect.value = card.dataset.service;
         });
     });
 
