@@ -1,4 +1,4 @@
-console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CORREGIDA');
+console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CON PROXY');
 
 // Variables globales
 let apiKey = '';
@@ -38,19 +38,23 @@ const elements = {
     debugStatus: document.getElementById('debug-status')
 };
 
-// Función para hacer peticiones a la API CORRECTA
+// Función para hacer peticiones a la API con PROXY CORS
 async function makeApiCall(endpoint, params = '', retry = true) {
     try {
-        // USAR LA API CORRECTA - ¡MUY IMPORTANTE!
-        const url = `https://onlinesim.io/api/${endpoint}.php?apikey=${apiKey}&${params}`;
-        console.log('🔍 Llamada API:', url);
+        // USAR PROXY CORS para evitar bloqueos
+        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        const apiUrl = `https://onlinesim.io/api/${endpoint}.php?apikey=${apiKey}&${params}`;
+        const url = proxyUrl + apiUrl;
+        
+        console.log('🔍 Llamada API con proxy:', url);
         
         const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'X-Requested-With': 'XMLHttpRequest'
             }
         });
         
@@ -66,8 +70,8 @@ async function makeApiCall(endpoint, params = '', retry = true) {
         
         if (retry && retryCount < MAX_RETRIES) {
             retryCount++;
-            console.log(`🔄 Reintento ${retryCount}/${MAX_RETRIES} en 3 segundos...`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log(`🔄 Reintento ${retryCount}/${MAX_RETRIES} en 5 segundos...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
             return makeApiCall(endpoint, params, false);
         }
         
@@ -201,7 +205,7 @@ function selectService(card) {
     }
 }
 
-// Obtener número real con reintentos y bypass
+// Obtener número real SIN bypass
 elements.getNumber.addEventListener('click', async () => {
     if (!currentService) return;
     
@@ -213,37 +217,7 @@ elements.getNumber.addEventListener('click', async () => {
         useBypassMode = false;
         
         // Obtener número real de la API
-        let data;
-        try {
-            data = await makeApiCall('getNum', `service=${currentService}&country=${elements.countrySelect.value}`);
-        } catch (error) {
-            console.log('❌ Error en API, intentando modo bypass...');
-            updateStatus('🔴 OnlineSim no responde. Usando modo bypass...', 'warning');
-            useBypassMode = true;
-        }
-        
-        // Si la API falló y estamos en modo bypass
-        if (useBypassMode) {
-            // Usar número de ejemplo
-            tzid = 'bypass_' + Date.now();
-            elements.phoneNumber.textContent = bypassNumber;
-            elements.codeSection.style.display = 'block';
-            elements.getNumber.disabled = true;
-            elements.forceNew.disabled = false;
-            
-            updateStatus('🟢 Número virtual asignado (modo bypass)', 'success');
-            addToHistory(`Número virtual asignado: ${bypassNumber}`);
-            
-            // Simular recepción de código
-            setTimeout(() => {
-                const fakeCode = Math.floor(Math.random() * 900000 + 100000);
-                elements.smsCode.textContent = fakeCode;
-                updateStatus('🟢 Código simulado (modo bypass)', 'success');
-                addToHistory(`Código simulado: ${fakeCode}`);
-            }, 3000);
-            
-            return;
-        }
+        const data = await makeApiCall('getNum', `service=${currentService}&country=${elements.countrySelect.value}`);
         
         // Si la API funcionó correctamente
         if (data && data.tzid) {
@@ -260,63 +234,24 @@ elements.getNumber.addEventListener('click', async () => {
             startCodeVerification();
         } else if (data && data.response === 'NO_NUMBER') {
             updateStatus('🔴 No hay números disponibles para este servicio', 'error');
-            useBypassMode = true;
-            elements.getNumber.click(); // Reintentar con bypass
         } else if (data && data.response === 'NO_BALANCE') {
             updateStatus('🔴 Saldo insuficiente', 'error');
         } else if (data && data.response === 'EXCEPTION') {
-            updateStatus('🔴 Error temporal del servidor. Intenta en 1 minuto o usa modo bypass', 'error');
-            useBypassMode = true;
-            elements.getNumber.click(); // Reintentar con bypass
+            updateStatus('🔴 Error temporal del servidor. Intenta en 1 minuto', 'error');
         } else if (data && data.response === 'ERROR_NO_SERVICE') {
             updateStatus('🔴 Servicio no disponible. Intenta con otro servicio', 'error');
-            useBypassMode = true;
-            elements.getNumber.click(); // Reintentar con bypass
-        } else if (data && Object.keys(data).length === 0) {
-            updateStatus('🔴 Respuesta vacía. Usando modo bypass', 'error');
-            useBypassMode = true;
-            elements.getNumber.click(); // Reintentar con bypass
+        } else if (data && data.response === 'UNDEFINED_COUNTRY') {
+            updateStatus('🔴 País no definido. Intenta con otro país', 'error');
         } else {
             console.error('Respuesta inesperada:', data);
             updateStatus('🔴 Error desconocido. Revisa la consola.', 'error');
-            useBypassMode = true;
-            elements.getNumber.click(); // Reintentar con bypass
         }
         
     } catch (error) {
         console.error('Error general:', error);
-        reintentarConBypass();
+        updateStatus('🔴 Error de conexión con la API', 'error');
     }
 });
-
-// Función para reintentar con bypass
-function reintentarConBypass() {
-    try {
-        updateStatus('🔄 Reintentando con modo bypass...', 'info');
-        
-        // Usar número de ejemplo
-        tzid = 'bypass_' + Date.now();
-        elements.phoneNumber.textContent = bypassNumber;
-        elements.codeSection.style.display = 'block';
-        elements.getNumber.disabled = true;
-        elements.forceNew.disabled = false;
-        
-        updateStatus('🟢 Número virtual asignado (modo bypass)', 'success');
-        addToHistory(`Número virtual asignado: ${bypassNumber}`);
-        
-        // Simular recepción de código
-        setTimeout(() => {
-            const fakeCode = Math.floor(Math.random() * 900000 + 100000);
-            elements.smsCode.textContent = fakeCode;
-            updateStatus('🟢 Código simulado (modo bypass)', 'success');
-            addToHistory(`Código simulado: ${fakeCode}`);
-        }, 3000);
-        
-    } catch (error) {
-        console.error('Error en reintentar:', error);
-        updateStatus('🔴 Error crítico en bypass', 'error');
-    }
-}
 
 // Forzar nuevo número
 elements.forceNew.addEventListener('click', async () => {
@@ -375,7 +310,7 @@ async function startCodeVerification() {
             } catch (error) {
                 console.error('Error verificando código:', error);
             }
-        }, 3000); // Verificar cada 3 segundos
+        }, 5000); // Verificar cada 5 segundos para evitar rate limiting
         
         // Detener después de 5 minutos máximo
         setTimeout(() => {
@@ -425,7 +360,7 @@ elements.copyCode.addEventListener('click', () => {
 elements.debugStatus.addEventListener('click', () => {
     try {
         console.log('🔍 ESTADO ACTUAL:');
-        console.log('📊 API Key:', apiKey);
+        console.log('📊 API Key:', apiKey ? '***OCULTA***' : 'No configurada');
         console.log('💰 Saldo:', realBalance);
         console.log('📱 Servicio:', currentService);
         console.log('📞 Número:', currentNumber);
@@ -434,7 +369,7 @@ elements.debugStatus.addEventListener('click', () => {
         console.log('🔁 Modo Bypass:', useBypassMode);
         console.log('📚 Historial:', operationHistory);
         
-        alert('Debug: Revisa la consola (F12)');
+        alert('Debug: Revisa la consola (F12)\nAPI Key oculta por seguridad');
     } catch (error) {
         console.error('Error en debug:', error);
     }
@@ -485,7 +420,7 @@ function updateHistoryDisplay() {
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CORREGIDA');
+    console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CON PROXY');
     loadConfig();
     updateHistoryDisplay();
 });
