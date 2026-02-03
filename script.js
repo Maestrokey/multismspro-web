@@ -1,426 +1,265 @@
-console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CON PROXY');
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURACIÓN ---
+    // IMPORTANTE: Reemplaza 'TU_API_KEY_AQUI' por tu clave real de OnlineSim.
+    // Para compartir, es mejor usar placeholders como este.
+    let currentApiKey = 'TU_API_KEY_AQUI';
 
-// Variables globales
-let apiKey = '';
-let realBalance = 0;
-let currentService = null;
-let currentNumber = null;
-let operationHistory = [];
-let tzid = null;
-let retryCount = 0;
-const MAX_RETRIES = 3;
+    // CAMBIO CLAVE: Usamos un proxy más estable para evitar el error 429.
+    // Si este falla, la única solución definitiva es crear tu propio proxy en la nube (Render, Heroku).
+    const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 
-// Variable para modo bypass
-let useBypassMode = false;
-let bypassNumber = '+34612345678';
+    // --- ELEMENTOS DEL DOM ---
+    const serviceSelect = document.getElementById('service-select');
+    const countrySelect = document.getElementById('country-select');
+    const buyButton = document.getElementById('buy-button'); // Asumiendo que tu botón tiene este ID
+    const phoneNumberSpan = document.getElementById('phone-number');
+    const activationCodeSpan = document.getElementById('activation-code');
+    const tzidSpan = document.getElementById('tzid');
+    const balanceSpan = document.getElementById('balance');
+    const saveConfigButton = document.getElementById('save-config');
+    const apiKeyInput = document.getElementById('api-key'); // ID del input de API Key en tu HTML
+    const activeServiceDisplay = document.getElementById('active-service');
+    const serviceCostDisplay = document.getElementById('service-cost');
+    const statusDiv = document.getElementById('status');
+    const forceNewButton = document.getElementById('force-new');
 
-// Elementos del DOM
-const elements = {
-    apiKey: document.getElementById('api-key'),
-    saveConfig: document.getElementById('save-config'),
-    buyKey: document.getElementById('buy-key'),
-    countrySelect: document.getElementById('country-select'),
-    servicesGrid: document.getElementById('services-grid'),
-    balanceDisplay: document.getElementById('balance-display'),
-    activeServiceInfo: document.getElementById('active-service-info'),
-    activeService: document.getElementById('active-service'),
-    serviceCost: document.getElementById('service-cost'),
-    numberSection: document.getElementById('number-section'),
-    phoneNumber: document.getElementById('phone-number'),
-    getNumber: document.getElementById('get-number'),
-    forceNew: document.getElementById('force-new'),
-    codeSection: document.getElementById('code-section'),
-    smsCode: document.getElementById('sms-code'),
-    copyCode: document.getElementById('copy-code'),
-    historySection: document.getElementById('history-section'),
-    historyContent: document.getElementById('history-content'),
-    status: document.getElementById('status'),
-    debugStatus: document.getElementById('debug-status')
-};
+    // --- ESTADO ---
+    let activeTzid = null;
+    let smsInterval = null;
 
-// Función para hacer peticiones a la API con PROXY CORS
-async function makeApiCall(endpoint, params = '', retry = true) {
-    try {
-        // USAR PROXY CORS para evitar bloqueos
-        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-        const apiUrl = `https://onlinesim.io/api/${endpoint}.php?apikey=${apiKey}&${params}`;
-        const url = proxyUrl + apiUrl;
+    // --- FUNCIONES PRINCIPALES ---
+
+    // Función principal para comprar un número
+    async function buyNumber() {
+        const selectedService = serviceSelect.value;
+        const selectedCountry = countrySelect.value;
+
+        if (!currentApiKey || currentApiKey === 'TU_API_KEY_AQUI') {
+            alert('Por favor, configura tu API Key en la sección de configuración.');
+            return;
+        }
+
+        resetUI();
+        setUIState('loading');
+        phoneNumberSpan.textContent = 'Solicitando número...';
+
+        try {
+            // Usamos el endpoint correcto para obtener un número de un solo uso
+            const getNumUrl = `${PROXY_URL}https://onlinesim.io/api/get_num.php?apikey=${currentApiKey}&service=${selectedService}&country=${selectedCountry}&ref=mail`;
+            console.log(`🔍 Solicitando número para ${selectedService} en país ${selectedCountry}...`);
+            
+            const response = await fetch(getNumUrl);
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            console.log('✅ Respuesta de get_num:', data);
+
+            // --- MANEJO CORRECTO DE LA RESPUESTA ---
+            if (data.response === 'NUMBER' && data.number) {
+                // ÉXITO: La API te da el número directamente
+                const phoneNumber = data.number;
+                activeTzid = data.tzid;
+
+                phoneNumberSpan.textContent = `+${phoneNumber}`;
+                tzidSpan.textContent = `TZID: ${activeTzid}`;
+                alert(`¡Número obtenido con éxito! +${phoneNumber}`);
+                setUIState('received');
+                waitForSms(activeTzid);
+
+            } else if (data.response === 'NO_NUMBER') {
+                throw new Error('No hay números disponibles para este servicio en este momento.');
+            } else if (data.response === 'ERROR_NO_SERVICE') {
+                throw new Error('El servicio seleccionado no es válido.');
+            } else if (data.response === 'ERROR_WRONG_API_KEY') {
+                throw new Error('Tu API Key es incorrecta o está bloqueada.');
+            } else {
+                // Si la API devuelve solo el TZID (lo que te pasaba antes), es un comportamiento inesperado para get_num
+                if (data.response === 1 && data.tzid) {
+                    throw new Error('La API devolvió solo TZID. Esto puede indicar un problema con el servicio o el endpoint. Revisa la consola.');
+                }
+                throw new Error('La API devolvió una respuesta inesperada.');
+            }
+
+        } catch (error) {
+            console.error('❌ Error al comprar el número:', error);
+            phoneNumberSpan.textContent = `Error: ${error.message}`;
+            alert(`Ocurrió un error: ${error.message}`);
+            setUIState('error');
+        }
+    }
+
+    // Función para esperar el código SMS
+    function waitForSms(tzid) {
+        if (smsInterval) clearInterval(smsInterval);
         
-        console.log('🔍 Llamada API con proxy:', url);
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'X-Requested-With': 'XMLHttpRequest'
+        let attempts = 0;
+        const maxAttempts = 30; // 30 intentos * 5 seg = 150 segundos (2.5 min)
+        const delay = 5000; // 5 segundos
+
+        activationCodeSpan.textContent = 'Esperando código...';
+        statusDiv.textContent = '🔵 Esperando código SMS...';
+
+        smsInterval = setInterval(async () => {
+            attempts++;
+            console.log(`⏳ Esperando SMS (intento ${attempts}/${maxAttempts}) para TZID: ${tzid}`);
+            
+            try {
+                const stateUrl = `${PROXY_URL}https://onlinesim.io/api/getState.php?apikey=${currentApiKey}&tzid=${tzid}&message_to=1`;
+                const stateResponse = await fetch(stateUrl);
+                const stateData = await stateResponse.json();
+                
+                // La API a veces devuelve un array, a veces un objeto. Manejamos ambos.
+                const status = stateData[0]?.response || stateData.response;
+
+                if (status === 'TZ_NUM_ANSWER') {
+                    const smsCode = stateData[0]?.msg || stateData.msg;
+                    if (smsCode) {
+                        clearInterval(smsInterval);
+                        activationCodeSpan.textContent = smsCode;
+                        statusDiv.textContent = '✅ Código recibido';
+                        alert(`¡Código recibido! ${smsCode}`);
+                        setUIState('code');
+                    }
+                } else if (status === 'TZ_NUM_USED' || status === 'TZ_NUM_EXPIRED') {
+                    clearInterval(smsInterval);
+                    activationCodeSpan.textContent = 'Sesión finalizada';
+                    statusDiv.textContent = '🔴 Número usado o expirado';
+                    alert('El número fue usado o la sesión expiró.');
+                    setUIState('error');
+                } else if (status === 'TZ_NUM_WAIT' || status === 'TZ_NUM_EMPTY') {
+                    // Seguir esperando...
+                }
+
+            } catch (error) {
+                console.error(`Error al verificar el estado del TZID ${tzid}:`, error);
+            }
+
+            if (attempts >= maxAttempts) {
+                clearInterval(smsInterval);
+                activationCodeSpan.textContent = 'Tiempo agotado';
+                statusDiv.textContent = '🔴 Tiempo de espera agotado';
+                alert('No se recibió el SMS a tiempo.');
+                setUIState('error');
+            }
+        }, delay);
+    }
+
+    // Función para obtener el balance
+    async function getBalance() {
+        if (!currentApiKey || currentApiKey === 'TU_API_KEY_AQUI') {
+            balanceSpan.textContent = 'N/A';
+            return;
+        }
+        try {
+            const balanceUrl = `${PROXY_URL}https://onlinesim.io/api/getBalance.php?apikey=${currentApiKey}`;
+            const response = await fetch(balanceUrl);
+            const data = await response.json();
+            if (data.response === 'ACCESS_NUMBER') {
+                balanceSpan.textContent = `$${parseFloat(data.balance).toFixed(2)}`;
+            } else if (data.response === 'ERROR_WRONG_API_KEY') {
+                balanceSpan.textContent = 'API Key Inválida';
+            } else {
+                balanceSpan.textContent = 'Error';
+            }
+        } catch (error) {
+            console.error('Error obteniendo balance:', error);
+            balanceSpan.textContent = 'Error de conexión';
+        }
+    }
+
+    // Función para resetear la UI
+    function resetUI() {
+        phoneNumberSpan.textContent = '';
+        activationCodeSpan.textContent = '---';
+        tzidSpan.textContent = '';
+        if (smsInterval) {
+            clearInterval(smsInterval);
+            smsInterval = null;
+        }
+        activeTzid = null;
+    }
+
+    // Función para cambiar el estado de los botones y la UI
+    function setUIState(state) {
+        buyButton.disabled = (state === 'loading');
+        forceNewButton.disabled = (state !== 'received' && state !== 'code');
+        if (state === 'loading') {
+            buyButton.textContent = 'Comprando...';
+        } else {
+            buyButton.textContent = '📞 Obtener Número';
+        }
+    }
+    
+    // Función para forzar un nuevo número (cancela el actual y pide otro)
+    async function forceNewNumber() {
+        if (!activeTzid) {
+            alert('No hay ninguna operación activa para cancelar.');
+            return;
+        }
+        if (!confirm('¿Estás seguro de que quieres cancelar este número y solicitar otro? Se te cobrará de nuevo.')) {
+            return;
+        }
+
+        try {
+            const banUrl = `${PROXY_URL}https://onlinesim.io/api/setOperationOk.php?apikey=${currentApiKey}&tzid=${activeTzid}&ban=1`;
+            await fetch(banUrl);
+            console.log(`Operación ${activeTzid} cancelada.`);
+            resetUI();
+            buyNumber(); // Inicia la compra de un nuevo número
+        } catch (error) {
+            console.error('Error al forzar nuevo número:', error);
+            alert('No se pudo cancelar la operación actual.');
+        }
+    }
+
+
+    // --- EVENT LISTENERS ---
+    if (buyButton) buyButton.addEventListener('click', buyNumber);
+    if (forceNewButton) forceNewButton.addEventListener('click', forceNewNumber);
+    
+    if (saveConfigButton) {
+        saveConfigButton.addEventListener('click', () => {
+            const newApiKey = apiKeyInput.value.trim();
+            if (newApiKey) {
+                currentApiKey = newApiKey;
+                localStorage.setItem('onlinesim_apikey', currentApiKey);
+                alert('Configuración guardada.');
+                getBalance(); // Actualizar balance con la nueva key
+            } else {
+                alert('Por favor, introduce una API Key válida.');
             }
         });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('📋 Respuesta API:', data);
-        return data;
-    } catch (error) {
-        console.error('❌ Error API:', error);
-        
-        if (retry && retryCount < MAX_RETRIES) {
-            retryCount++;
-            console.log(`🔄 Reintento ${retryCount}/${MAX_RETRIES} en 5 segundos...`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            return makeApiCall(endpoint, params, false);
-        }
-        
-        throw error;
     }
-}
 
-// Cargar configuración guardada
-function loadConfig() {
-    try {
-        const savedApiKey = localStorage.getItem('multisms_api_key');
-        
-        if (savedApiKey) {
-            apiKey = savedApiKey;
-            elements.apiKey.value = apiKey;
-            elements.status.textContent = '🔵 Verificando API Key...';
-            
-            // Verificar API Key y obtener saldo real
-            verifyApiKey();
-        } else {
-            elements.status.textContent = '🔴 Esperando configuración';
-        }
-    } catch (error) {
-        console.error('Error cargando configuración:', error);
-        elements.status.textContent = '🔴 Error cargando configuración';
-    }
-}
-
-// Verificar API Key con la API real
-async function verifyApiKey() {
-    try {
-        const data = await makeApiCall('getBalance');
-        
-        if (data.balance !== undefined) {
-            realBalance = parseFloat(data.balance);
-            elements.balanceDisplay.textContent = `Saldo: $${realBalance.toFixed(2)}`;
-            
-            // Verificar si hay saldo suficiente
-            if (realBalance < 0.9) {
-                elements.status.textContent = '🔡 Saldo insuficiente para wallapop ($0.9)';
-            } else {
-                elements.status.textContent = '🟢 API Key válida';
-                enableServices();
-            }
-        } else {
-            throw new Error('API Key inválida');
-        }
-    } catch (error) {
-        console.error('Error verificando API Key:', error);
-        elements.status.textContent = '🔴 API Key inválida';
-        localStorage.removeItem('multisms_api_key');
-    }
-}
-
-// Guardar configuración
-elements.saveConfig.addEventListener('click', async () => {
-    try {
-        apiKey = elements.apiKey.value.trim();
-        if (!apiKey) {
-            updateStatus('🔴 Por favor ingresa una API Key válida', 'error');
-            return;
-        }
-        
-        elements.status.textContent = '🔵 Verificando API Key...';
-        
-        // Verificar API Key antes de guardar
-        const data = await makeApiCall('getBalance');
-        
-        if (data.balance !== undefined) {
-            localStorage.setItem('multisms_api_key', apiKey);
-            realBalance = parseFloat(data.balance);
-            elements.balanceDisplay.textContent = `Saldo: $${realBalance.toFixed(2)}`;
-            updateStatus('🟢 API Key guardada y verificada', 'success');
-            enableServices();
-        } else {
-            throw new Error('API Key inválida');
-        }
-    } catch (error) {
-        console.error('Error guardando configuración:', error);
-        updateStatus('🔴 API Key inválida. Verifícala e intenta nuevamente.', 'error');
-    }
-});
-
-// Comprar llave
-elements.buyKey.addEventListener('click', () => {
-    updateStatus('🔵 Abriendo tu canal de Telegram...', 'info');
-    
-    // Abrir directamente en navegador
-    window.open('https://t.me/Multi_SMSPro', '_blank');
-    
-    // Mostrar instrucciones adicionales
-    setTimeout(() => {
-        updateStatus('📋 Sigue las instrucciones en Telegram', 'info');
-    }, 1000);
-});
-
-// Seleccionar servicio
-function enableServices() {
+    // Listener para actualizar el servicio activo y su coste
     const serviceCards = document.querySelectorAll('.service-card');
     serviceCards.forEach(card => {
-        card.addEventListener('click', () => selectService(card));
+        card.addEventListener('click', () => {
+            serviceCards.forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            const serviceName = card.dataset.service.toLowerCase();
+            const servicePrice = card.querySelector('.service-price').textContent;
+            
+            if (activeServiceDisplay) activeServiceDisplay.textContent = serviceName;
+            if (serviceCostDisplay) serviceCostDisplay.textContent = servicePrice;
+            if (serviceSelect) serviceSelect.value = card.dataset.service; // Sincroniza con el select si existe
+        });
     });
-}
 
-function selectService(card) {
-    try {
-        document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        
-        currentService = card.dataset.service;
-        const serviceName = card.querySelector('.service-name').textContent;
-        const servicePrice = card.querySelector('.service-price').textContent;
-        
-        elements.activeService.textContent = serviceName;
-        elements.serviceCost.textContent = servicePrice;
-        elements.activeServiceInfo.style.display = 'block';
-        elements.numberSection.style.display = 'block';
-        
-        elements.getNumber.disabled = false;
-        elements.forceNew.disabled = false;
-        
-        updateStatus(`🟢 Servicio seleccionado: ${serviceName}`, 'success');
-        
-        // Resetear contador de reintentos y modo bypass
-        retryCount = 0;
-        useBypassMode = false;
-        
-    } catch (error) {
-        console.error('Error seleccionando servicio:', error);
-        updateStatus('🔴 Error seleccionando servicio', 'error');
-    }
-}
 
-// Obtener número real SIN bypass
-elements.getNumber.addEventListener('click', async () => {
-    if (!currentService) return;
-    
-    try {
-        updateStatus('🔵 Obteniendo número real...', 'info');
-        
-        // Resetear contador de reintentos
-        retryCount = 0;
-        useBypassMode = false;
-        
-        // Obtener número real de la API
-        const data = await makeApiCall('getNum', `service=${currentService}&country=${elements.countrySelect.value}`);
-        
-        // Si la API funcionó correctamente
-        if (data && data.tzid) {
-            tzid = data.tzid;
-            elements.phoneNumber.textContent = data.number || `TZID: ${tzid}`;
-            elements.codeSection.style.display = 'block';
-            elements.getNumber.disabled = true;
-            elements.forceNew.disabled = false;
-            
-            updateStatus('🟢 Número obtenido correctamente', 'success');
-            addToHistory(`Número obtenido: ${data.number || tzid}`);
-            
-            // Comenzar a verificar el código
-            startCodeVerification();
-        } else if (data && data.response === 'NO_NUMBER') {
-            updateStatus('🔴 No hay números disponibles para este servicio', 'error');
-        } else if (data && data.response === 'NO_BALANCE') {
-            updateStatus('🔴 Saldo insuficiente', 'error');
-        } else if (data && data.response === 'EXCEPTION') {
-            updateStatus('🔴 Error temporal del servidor. Intenta en 1 minuto', 'error');
-        } else if (data && data.response === 'ERROR_NO_SERVICE') {
-            updateStatus('🔴 Servicio no disponible. Intenta con otro servicio', 'error');
-        } else if (data && data.response === 'UNDEFINED_COUNTRY') {
-            updateStatus('🔴 País no definido. Intenta con otro país', 'error');
-        } else {
-            console.error('Respuesta inesperada:', data);
-            updateStatus('🔴 Error desconocido. Revisa la consola.', 'error');
+    // --- INICIALIZACIÓN ---
+    function initialize() {
+        // Cargar API Key desde localStorage si existe
+        const savedApiKey = localStorage.getItem('onlinesim_apikey');
+        if (savedApiKey) {
+            currentApiKey = savedApiKey;
+            if (apiKeyInput) apiKeyInput.value = currentApiKey;
         }
         
-    } catch (error) {
-        console.error('Error general:', error);
-        updateStatus('🔴 Error de conexión con la API', 'error');
+        // Cargar balance inicial
+        getBalance();
     }
-});
 
-// Forzar nuevo número
-elements.forceNew.addEventListener('click', async () => {
-    try {
-        if (confirm('¿Estás seguro de solicitar un nuevo número?')) {
-            // Cancelar operación actual
-            if (tzid) {
-                await makeApiCall('setOperationOk', `tzid=${tzid}&ban=1`);
-            }
-            
-            // Resetear estado
-            tzid = null;
-            currentNumber = null;
-            elements.phoneNumber.textContent = '---';
-            elements.smsCode.textContent = '---';
-            elements.codeSection.style.display = 'none';
-            
-            elements.getNumber.disabled = false;
-            elements.forceNew.disabled = true;
-            
-            updateStatus('🔵 Listo para obtener nuevo número', 'info');
-            
-            // Resetear modo bypass
-            useBypassMode = false;
-            retryCount = 0;
-        }
-    } catch (error) {
-        console.error('Error forzando nuevo número:', error);
-        updateStatus('🔴 Error forzando nuevo número', 'error');
-    }
-});
-
-// Verificar código SMS real
-async function startCodeVerification() {
-    try {
-        updateStatus('🔵 Esperando código SMS...', 'info');
-        
-        const checkInterval = setInterval(async () => {
-            try {
-                const data = await makeApiCall('getState', `tzid=${tzid}`);
-                
-                if (data.response === 'STATUS_OK') {
-                    clearInterval(checkInterval);
-                    elements.smsCode.textContent = data.msg || data.code || 'Código recibido';
-                    updateStatus('🟢 Código SMS recibido', 'success');
-                    addToHistory(`Código recibido: ${data.msg || data.code}`);
-                    
-                    // Actualizar saldo
-                    setTimeout(() => updateBalance(), 2000);
-                } else if (data.response === 'STATUS_WAIT_CODE') {
-                    updateStatus('🔵 Esperando código...', 'info');
-                } else if (data.response === 'STATUS_CANCEL') {
-                    clearInterval(checkInterval);
-                    updateStatus('🔴 Operación cancelada', 'error');
-                }
-            } catch (error) {
-                console.error('Error verificando código:', error);
-            }
-        }, 5000); // Verificar cada 5 segundos para evitar rate limiting
-        
-        // Detener después de 5 minutos máximo
-        setTimeout(() => {
-            clearInterval(checkInterval);
-            if (elements.smsCode.textContent === '---') {
-                updateStatus('🔴 Tiempo de espera agotado', 'error');
-            }
-        }, 300000);
-        
-    } catch (error) {
-        console.error('Error iniciando verificación:', error);
-        updateStatus('🔴 Error iniciando verificación', 'error');
-    }
-}
-
-// Actualizar saldo
-async function updateBalance() {
-    try {
-        const data = await makeApiCall('getBalance');
-        if (data.balance !== undefined) {
-            realBalance = parseFloat(data.balance);
-            elements.balanceDisplay.textContent = `Saldo: $${realBalance.toFixed(2)}`;
-        }
-    } catch (error) {
-        console.error('Error actualizando saldo:', error);
-    }
-}
-
-// Copiar código
-elements.copyCode.addEventListener('click', () => {
-    try {
-        const code = elements.smsCode.textContent;
-        if (code && code !== '---') {
-            navigator.clipboard.writeText(code).then(() => {
-                updateStatus('🟢 Código copiado al portapapeles', 'success');
-            }).catch(() => {
-                updateStatus('🔴 Error copiando código', 'error');
-            });
-        }
-    } catch (error) {
-        console.error('Error copiando código:', error);
-        updateStatus('🔴 Error copiando código', 'error');
-    }
-});
-
-// Debug
-elements.debugStatus.addEventListener('click', () => {
-    try {
-        console.log('🔍 ESTADO ACTUAL:');
-        console.log('📊 API Key:', apiKey ? '***OCULTA***' : 'No configurada');
-        console.log('💰 Saldo:', realBalance);
-        console.log('📱 Servicio:', currentService);
-        console.log('📞 Número:', currentNumber);
-        console.log('🔑 TZID:', tzid);
-        console.log('🔄 Reintentos:', retryCount);
-        console.log('🔁 Modo Bypass:', useBypassMode);
-        console.log('📚 Historial:', operationHistory);
-        
-        alert('Debug: Revisa la consola (F12)\nAPI Key oculta por seguridad');
-    } catch (error) {
-        console.error('Error en debug:', error);
-    }
-});
-
-// Funciones auxiliares
-function updateStatus(message, type = 'info') {
-    try {
-        elements.status.textContent = message;
-        console.log(`[${type.toUpperCase()}] ${message}`);
-    } catch (error) {
-        console.error('Error actualizando estado:', error);
-    }
-}
-
-function addToHistory(action) {
-    try {
-        const timestamp = new Date().toLocaleTimeString();
-        operationHistory.unshift({ action, timestamp });
-        
-        if (operationHistory.length > 10) {
-            operationHistory.pop();
-        }
-        
-        updateHistoryDisplay();
-    } catch (error) {
-        console.error('Error añadiendo al historial:', error);
-    }
-}
-
-function updateHistoryDisplay() {
-    try {
-        if (operationHistory.length === 0) {
-            elements.historyContent.innerHTML = '<p class="no-history">No hay operaciones recientes</p>';
-            return;
-        }
-        
-        elements.historyContent.innerHTML = operationHistory
-            .map(item => `
-                <div class="history-item">
-                    <strong>${item.timestamp}</strong> - ${item.action}
-                </div>
-            `).join('');
-    } catch (error) {
-        console.error('Error actualizando historial:', error);
-    }
-}
-
-// Inicialización
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Multi-SMS Pro Web - VERSIÓN FINAL CON PROXY');
-    loadConfig();
-    updateHistoryDisplay();
+    initialize();
 });
